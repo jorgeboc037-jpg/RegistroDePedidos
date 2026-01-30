@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Sistema PRO de Pedidos</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+
+</head>
+
+<body class="bg-gray-100 p-6">
+
+<div class="max-w-5xl mx-auto bg-white p-6 rounded-xl shadow">
+
+<h1 class="text-3xl font-bold text-red-700 mb-6">Sistema PRO de Pedidos</h1>
+
+<!-- CLIENTE -->
+<div class="grid grid-cols-2 gap-4 mb-6">
+<input id="cliente" placeholder="Nombre Cliente" class="border p-2 rounded">
+<input id="telefono" placeholder="Teléfono" class="border p-2 rounded">
+<input id="negocio" placeholder="Negocio" class="border p-2 rounded">
+<input id="nit" placeholder="NIT" class="border p-2 rounded">
+</div>
+
+<!-- TABLA -->
+<table class="w-full mb-4">
+<thead class="bg-red-700 text-white">
+<tr>
+<th>Descripción</th>
+<th>Cantidad</th>
+<th>Precio</th>
+<th>Total</th>
+<th></th>
+</tr>
+</thead>
+<tbody id="tabla"></tbody>
+</table>
+
+<button onclick="agregar()" class="bg-red-600 text-white px-4 py-2 rounded">Agregar Producto</button>
+
+<h2 class="text-2xl font-bold mt-4">Total: Q <span id="total">0.00</span></h2>
+
+<!-- BOTONES -->
+<div class="flex flex-wrap gap-3 mt-4">
+
+<button onclick="guardar()" class="bg-green-600 text-white px-4 py-2 rounded">Guardar Pedido</button>
+
+<button onclick="pdf()" class="bg-red-700 text-white px-4 py-2 rounded">Generar PDF</button>
+
+<button onclick="exportarExcel()" class="bg-blue-600 text-white px-4 py-2 rounded">Exportar Excel</button>
+
+<button onclick="whatsapp()" class="bg-green-700 text-white px-4 py-2 rounded">Enviar WhatsApp</button>
+
+<button onclick="verHistorial()" class="bg-gray-800 text-white px-4 py-2 rounded">Historial</button>
+
+</div>
+
+<div id="historial" class="mt-6"></div>
+
+</div>
+
+<script>
+
+let productos=[];
+
+// -------- PRODUCTOS --------
+
+function agregar(){
+productos.push({d:"",c:1,p:0});
+render();
+}
+
+function render(){
+let html="";
+productos.forEach((x,i)=>{
+html+=`
+<tr>
+<td><input onchange="productos[${i}].d=this.value" class="border p-1"/></td>
+<td><input type=number value=1 onchange="productos[${i}].c=this.value;calc()" class="border p-1 w-20"/></td>
+<td><input type=number value=0 onchange="productos[${i}].p=this.value;calc()" class="border p-1 w-24"/></td>
+<td id="t${i}">Q0</td>
+<td><button onclick="productos.splice(${i},1);render();calc()">X</button></td>
+</tr>`;
+});
+tabla.innerHTML=html;
+calc();
+}
+
+function calc(){
+let t=0;
+productos.forEach((x,i)=>{
+let r=x.c*x.p;
+document.getElementById("t"+i).innerText="Q"+r.toFixed(2);
+t+=r;
+});
+total.innerText=t.toFixed(2);
+}
+
+// -------- HISTORIAL --------
+
+function guardar(){
+let hist=JSON.parse(localStorage.getItem("pedidos")||"[]");
+
+hist.push({
+fecha:new Date().toLocaleString(),
+cliente:cliente.value,
+total:total.innerText
+});
+
+localStorage.setItem("pedidos",JSON.stringify(hist));
+alert("Pedido guardado");
+}
+
+function verHistorial(){
+let hist=JSON.parse(localStorage.getItem("pedidos")||"[]");
+
+historial.innerHTML=hist.map(x=>
+`<div class="border-b p-2">${x.fecha} | ${x.cliente} | Q${x.total}</div>`
+).join("");
+}
+
+// -------- EXCEL --------
+
+function exportarExcel(){
+let csv="Descripcion,Cantidad,Precio,Total\n";
+
+productos.forEach(x=>{
+csv+=`${x.d},${x.c},${x.p},${x.c*x.p}\n`;
+});
+
+let blob=new Blob([csv],{type:"text/csv"});
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="pedido.csv";
+a.click();
+}
+
+// -------- WHATSAPP --------
+
+function whatsapp(){
+let texto=`Pedido de ${cliente.value}\nTotal Q${total.innerText}`;
+let url=`https://wa.me/?text=${encodeURIComponent(texto)}`;
+window.open(url,"_blank");
+}
+
+// -------- PDF FACTURA --------
+
+function pdf(){
+
+const {jsPDF}=window.jspdf;
+let doc=new jsPDF();
+let w=doc.internal.pageSize.getWidth();
+
+// Header rojo
+doc.setFillColor(185,28,28);
+doc.rect(0,0,w,35,"F");
+
+// Logo
+try{
+doc.addImage("logo.png","PNG",10,5,25,25);
+}catch(e){}
+
+// Título
+doc.setTextColor(255,255,255);
+doc.setFontSize(18);
+doc.text("FACTURA / PEDIDO",w/2,20,{align:"center"});
+
+// Datos
+doc.setTextColor(0,0,0);
+doc.setFontSize(12);
+
+doc.text("Cliente: "+cliente.value,10,50);
+doc.text("Negocio: "+negocio.value,10,58);
+doc.text("Tel: "+telefono.value,10,66);
+doc.text("NIT: "+nit.value,10,74);
+
+// Tabla
+let data=productos.map(x=>[
+x.d,
+x.c,
+"Q"+x.p,
+"Q"+(x.c*x.p)
+]);
+
+doc.autoTable({
+startY:85,
+head:[["Desc","Cant","Precio","Total"]],
+body:data,
+headStyles:{fillColor:[185,28,28]}
+});
+
+// Total
+doc.setFontSize(16);
+doc.text("TOTAL: Q"+total.innerText,140,doc.lastAutoTable.finalY+15);
+
+doc.save("pedido.pdf");
+}
+
+</script>
+
+</body>
+</html>
