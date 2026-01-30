@@ -96,6 +96,8 @@
        </div>
        <div class="md:col-span-2"><label class="block text-sm font-medium text-slate-600 mb-1">Dirección</label> <input type="text" id="cliente-direccion" placeholder="Zona 1, Ciudad de Guatemala" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-800 placeholder-slate-400">
        </div>
+       <div><label class="block text-sm font-medium text-slate-600 mb-1">No. de Orden *</label> <input type="text" id="numero-orden" placeholder="001" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-800 placeholder-slate-400">
+       </div>
       </div>
      </section><!-- Tabla de Productos -->
      <section class="card p-6 mb-6">
@@ -373,9 +375,15 @@
     function guardarPedido() {
       const clienteNombre = document.getElementById('cliente-nombre').value.trim();
       const clienteTelefono = document.getElementById('cliente-telefono').value.trim();
+      const numeroOrden = document.getElementById('numero-orden').value.trim();
 
       if (!clienteNombre) {
         showToast('Ingresa el nombre del cliente', 'error');
+        return;
+      }
+
+      if (!numeroOrden) {
+        showToast('Ingresa el número de orden', 'error');
         return;
       }
 
@@ -392,6 +400,7 @@
         cliente_nit: document.getElementById('cliente-nit').value.trim(),
         cliente_telefono: clienteTelefono,
         cliente_direccion: document.getElementById('cliente-direccion').value.trim(),
+        numero_orden: numeroOrden,
         productos: JSON.stringify(productos),
         total: productos.reduce((sum, p) => sum + (p.cantidad * p.precio), 0)
       };
@@ -434,6 +443,7 @@
           <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer" onclick="verDetallePedido('${pedido.id}')">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs px-2 py-0.5 bg-slate-700 text-white rounded-full font-mono">Orden ${escapeHtml(pedido.numero_orden || '-')}</span>
                 <span class="font-semibold text-slate-800 truncate">${escapeHtml(pedido.cliente_nombre)}</span>
                 ${pedido.cliente_negocio ? `<span class="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded-full truncate">${escapeHtml(pedido.cliente_negocio)}</span>` : ''}
               </div>
@@ -467,6 +477,10 @@
       const content = document.getElementById('modal-detalle-content');
       content.innerHTML = `
         <div class="space-y-4">
+          <div class="bg-slate-50 rounded-xl p-4">
+            <p class="text-sm text-slate-500 mb-1">No. de Orden</p>
+            <p class="font-bold text-slate-800 text-lg">Orden ${escapeHtml(pedido.numero_orden || '-')}</p>
+          </div>
           <div class="bg-slate-50 rounded-xl p-4">
             <p class="text-sm text-slate-500 mb-1">Fecha</p>
             <p class="font-medium text-slate-800">${fecha}</p>
@@ -531,6 +545,7 @@
       document.getElementById('cliente-nit').value = pedido.cliente_nit || '';
       document.getElementById('cliente-telefono').value = pedido.cliente_telefono || '';
       document.getElementById('cliente-direccion').value = pedido.cliente_direccion || '';
+      document.getElementById('numero-orden').value = pedido.numero_orden || '';
       
       productos = JSON.parse(pedido.productos || '[]').map(p => ({
         ...p,
@@ -577,6 +592,7 @@
       document.getElementById('cliente-nit').value = '';
       document.getElementById('cliente-telefono').value = '';
       document.getElementById('cliente-direccion').value = '';
+      document.getElementById('numero-orden').value = '';
       productos = [];
       renderProductos();
       updateTotal();
@@ -585,9 +601,15 @@
     // ============ GENERAR PDF ============
     function generarPDF() {
       const clienteNombre = document.getElementById('cliente-nombre').value.trim();
+      const numeroOrden = document.getElementById('numero-orden').value.trim();
       
       if (!clienteNombre) {
         showToast('Ingresa el nombre del cliente', 'error');
+        return;
+      }
+
+      if (!numeroOrden) {
+        showToast('Ingresa el número de orden', 'error');
         return;
       }
 
@@ -607,14 +629,13 @@
       doc.setFillColor(220, 38, 38);
       doc.rect(0, 0, pageWidth, 50, 'F');
 
-      // Número de factura
+      // Número de orden
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(pageWidth - margin - 50, 10, 50, 12, 2, 2, 'F');
       doc.setFontSize(8);
       doc.setTextColor(220, 38, 38);
       doc.setFont('helvetica', 'bold');
-      const numFactura = `F-${Date.now().toString().slice(-6)}`;
-      doc.text(numFactura, pageWidth - margin - 25, 17, { align: 'center' });
+      doc.text(`Orden No. ${numeroOrden}`, pageWidth - margin - 25, 17, { align: 'center' });
 
       // Nombre empresa
       doc.setTextColor(255, 255, 255);
@@ -646,11 +667,11 @@
       doc.setFontSize(8);
       doc.text(`Fecha: ${fecha}`, pageWidth - margin, 32, { align: 'right' });
 
-      // Título de factura
+      // Título de orden
       doc.setTextColor(220, 38, 38);
       doc.setFontSize(20);
       doc.setFont('times', 'bold');
-      doc.text('FACTURA', pageWidth / 2, 65, { align: 'center' });
+      doc.text('ORDEN DE COMPRA', pageWidth / 2, 65, { align: 'center' });
 
       // Datos del cliente - Estilo factura
       let y = 75;
@@ -770,7 +791,9 @@
       doc.text('Documento generado electr��nicamente', pageWidth / 2, pageHeight - 10, { align: 'center' });
 
       // Descargar
-      const fileName = `Factura_${clienteNombre.replace(/\s+/g, '_')}_${numFactura}.pdf`;
+      const clienteNegocio = document.getElementById('cliente-negocio').value.trim();
+      const nombreArchivo = clienteNegocio || clienteNombre;
+      const fileName = `${nombreArchivo.replace(/\s+/g, '_')}_Orden_${numeroOrden}.pdf`;
       doc.save(fileName);
       showToast('PDF generado exitosamente', 'success');
     }
@@ -789,7 +812,7 @@
       const icons = {
         success: '✓',
         error: '✕',
-        info: 'ℹ'
+        info: '��'
       };
 
       toast.className = `toast flex items-center gap-3 px-4 py-3 rounded-xl text-white shadow-lg ${colors[type]} mb-2`;
@@ -812,5 +835,5 @@
     // Iniciar aplicación
     init();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c5e855f54730da2',t:'MTc2OTc1MDQzNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c5e902f63450da2',t:'MTc2OTc1MDg3OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
